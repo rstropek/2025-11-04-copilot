@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
 from dotenv import load_dotenv
+import pandas as pd
 
 # Load environment variables
 load_dotenv()
@@ -24,11 +25,14 @@ BASE_DIR = Path(__file__).resolve().parent
 # Global variable to store the system prompt
 system_prompt: str = ""
 
+# Global variable to store the dataset
+df: pd.DataFrame = pd.DataFrame()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Load configuration at startup and clean up at shutdown."""
-    global system_prompt
+    global system_prompt, df
 
     # Load system prompt from file
     prompt_path = BASE_DIR / "config" / "system_prompt.md"
@@ -37,6 +41,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             system_prompt = f.read()
     except FileNotFoundError:
         system_prompt = "No system prompt loaded"
+
+    # Load prosthetics data
+    data_path = BASE_DIR.parent / "data" / "prosthetics_data.csv"
+    try:
+        df = pd.read_csv(data_path)
+        print(f"Loaded dataset with {len(df)} rows and {len(df.columns)} columns")
+    except FileNotFoundError:
+        print(f"Warning: Dataset not found at {data_path}")
+        df = pd.DataFrame()
 
     yield
 
@@ -125,6 +138,7 @@ async def post_ask(request: Request, prompt: Annotated[str, Form()]) -> HTMLResp
                     "type": type,
                     "__import__": __import__,
                 },
+                "df": df.copy(),  # Provide a copy of the DataFrame to avoid accidental modifications
             }
 
             # Execute the script
