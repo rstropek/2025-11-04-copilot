@@ -1,0 +1,5 @@
+patient_id,age,gender,amputation_level,amputation_side,foot_type,knee_type,hip_type,fitting_date,num_visits,outcome_score,satisfaction_rating
+62961957,69,M,transtibial,R,Ottobock Renegade AT,None,None,2023-07-04,4,90.8,4.4
+50063462,39,F,transtibial,R,Ottobock Taleo Adapt,None,None,2024-04-06,3,75.2,3.5
+49975743,59,M,transtibial,R,Ossur Proflex LP Torsion,None,None,2024-01-16,2,77.2,3.2
+71491108,72,M,transfemoral,R,Ossur Proflex Balance Foot S Torsion,Ottobock Genium X3,None,2024-03-19,5,76.0,4.3
