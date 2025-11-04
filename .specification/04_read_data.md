@@ -8,8 +8,8 @@ In this iteration, we want to integrate the reading of a dataset into the applic
 
 ## Read Data Frame
 
-* The application must read the dataset in [prosthetics_data.csv](../data/prosthetics_data.csv) at startup (note: it is large; nearly 100MB) into memory. You can assume that the data fits into memory easily.
-* The dataset must be stored in a Pandas DataFrame for further processing.
+* The application must read the dataset in [prosthetics_data.csv](../data/prosthetics_data.csv) at startup (note: it is large, nearly 100MB) into memory. You can assume that the data fits into memory easily. The git repository does not contain the full dataset. You can find a shortened version in [prosthetics_data_short.csv](../data/prosthetics_data_short.csv) (only for testing and development purposes).
+* The dataset (full one, not the shortened version) must be stored in a Pandas DataFrame for further processing.
 * The dataset must be made accessible to the generated Python code (`exec()` environment) under the variable name `df`. Provide a copy of the DataFrame to avoid accidental modifications.
 * The system prompt in [system_prompt.md](../src/config/system_prompt.md) must be adjusted accordingly.
   * It must inform the AI model that the dataset is available in a Pandas DataFrame named `df`.
