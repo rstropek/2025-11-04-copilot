@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
 from dotenv import load_dotenv
+import pandas as pd
 
 # Load environment variables
 load_dotenv()
@@ -21,14 +22,15 @@ load_dotenv()
 # Get the directory where main.py is located
 BASE_DIR = Path(__file__).resolve().parent
 
-# Global variable to store the system prompt
+# Global variables
 system_prompt: str = ""
+prosthetics_dataframe: pd.DataFrame = pd.DataFrame()  # Initialize with empty DataFrame
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Load configuration at startup and clean up at shutdown."""
-    global system_prompt
+    global system_prompt, prosthetics_dataframe
 
     # Load system prompt from file
     prompt_path = BASE_DIR / "config" / "system_prompt.md"
@@ -37,6 +39,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             system_prompt = f.read()
     except FileNotFoundError:
         system_prompt = "No system prompt loaded"
+
+    # Load prosthetics dataset
+    # Try the full dataset first, fall back to the short version for testing
+    data_path = BASE_DIR.parent / "data" / "prosthetics_data.csv"
+    if not data_path.exists():
+        data_path = BASE_DIR.parent / "data" / "prosthetics_data_short.csv"
+
+    try:
+        prosthetics_dataframe = pd.read_csv(data_path)
+    except FileNotFoundError:
+        # Create an empty DataFrame if no data file exists
+        prosthetics_dataframe = pd.DataFrame()
 
     yield
 
@@ -53,13 +67,13 @@ templates: Jinja2Templates = Jinja2Templates(directory=str(BASE_DIR / "templates
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
-@app.get("/", response_class=HTMLResponse)  # type: ignore[misc]
+@app.get("/", response_class=HTMLResponse)
 async def get_index(request: Request) -> HTMLResponse:
     """Render the main page template."""
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.post("/ask", response_class=HTMLResponse)  # type: ignore[misc]
+@app.post("/ask", response_class=HTMLResponse)
 async def post_ask(request: Request, prompt: Annotated[str, Form()]) -> HTMLResponse:
     """Process a user prompt using OpenAI Responses API and execute generated Python code."""
     temp_dir: str = ""
@@ -125,6 +139,7 @@ async def post_ask(request: Request, prompt: Annotated[str, Form()]) -> HTMLResp
                     "type": type,
                     "__import__": __import__,
                 },
+                "df": prosthetics_dataframe.copy(),  # Provide a copy to prevent modifications
             }
 
             # Execute the script
