@@ -39,7 +39,7 @@
                 </div>
                 <div class="prompt-card" onclick="fillPrompt('sample2')">
                     <h3>Average Ratings</h3>
-                    <p>What is the average satisfactory rating per foot type, knee type, and hip type?</p>
+                    <p>What is the average satisfaction rating per foot type, knee type, and hip type?</p>
                 </div>
                 <div class="prompt-card" onclick="fillPrompt('sample3')">
                     <h3>Outcome Analysis</h3>
@@ -62,7 +62,7 @@
             const textarea = document.getElementById('prompt-input');
             const sampleTexts = {
                 'sample1': 'Show me the distribution of amputation levels',
-                'sample2': 'What is the average satisfactory rating per foot type, knee type, and hip type?',
+                'sample2': 'What is the average satisfaction rating per foot type, knee type, and hip type?',
                 'sample3': 'Show me a scatter plot of days since last fitting versus outcome score'
             };
             textarea.value = sampleTexts[sampleId] || '';

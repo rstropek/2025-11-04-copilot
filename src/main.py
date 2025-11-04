@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # Global variables
 system_prompt: str = ""
-prosthetics_dataframe: pd.DataFrame
+prosthetics_dataframe: pd.DataFrame = pd.DataFrame()  # Initialize with empty DataFrame
 
 
 @asynccontextmanager
