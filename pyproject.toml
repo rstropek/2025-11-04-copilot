@@ -8,6 +8,10 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.14,<4.0"
 dependencies = [
+    "fastapi (>=0.121.0,<0.122.0)",
+    "uvicorn (>=0.38.0,<0.39.0)",
+    "jinja2 (>=3.1.6,<4.0.0)",
+    "python-multipart (>=0.0.20,<0.0.21)"
 ]
 
 [tool.poetry]
@@ -28,7 +32,7 @@ dev = [
 format = "black ."
 format-check = "black --check ."
 typecheck = "mypy ."
-start = "python src/main.py"
+start = "uvicorn src.main:app --reload"
 
 [tool.mypy]
 python_version = "3.14"
