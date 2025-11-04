@@ -11,7 +11,10 @@ dependencies = [
     "fastapi (>=0.121.0,<0.122.0)",
     "uvicorn (>=0.38.0,<0.39.0)",
     "jinja2 (>=3.1.6,<4.0.0)",
-    "python-multipart (>=0.0.20,<0.0.21)"
+    "python-multipart (>=0.0.20,<0.0.21)",
+    "openai (>=2.7.1,<3.0.0)",
+    "matplotlib (>=3.10.7,<4.0.0)",
+    "python-dotenv (>=1.2.1,<2.0.0)"
 ]
 
 [tool.poetry]

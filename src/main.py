@@ -1,15 +1,50 @@
 from typing import Annotated
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+import os
+import re
+import base64
+import tempfile
+import shutil
+from pathlib import Path
+
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
+from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Get the directory where main.py is located
 BASE_DIR = Path(__file__).resolve().parent
 
-# Create FastAPI app
-app: FastAPI = FastAPI()
+# Global variable to store the system prompt
+system_prompt: str = ""
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Load configuration at startup and clean up at shutdown."""
+    global system_prompt
+
+    # Load system prompt from file
+    prompt_path = BASE_DIR / "config" / "system_prompt.md"
+    try:
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            system_prompt = f.read()
+    except FileNotFoundError:
+        system_prompt = "No system prompt loaded"
+
+    yield
+
+    # Cleanup (if needed)
+
+
+# Create FastAPI app with lifespan
+app: FastAPI = FastAPI(lifespan=lifespan)
 
 # Configure Jinja2 templates
 templates: Jinja2Templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -26,17 +61,114 @@ async def get_index(request: Request) -> HTMLResponse:
 
 @app.post("/ask", response_class=HTMLResponse)  # type: ignore[misc]
 async def post_ask(request: Request, prompt: Annotated[str, Form()]) -> HTMLResponse:
-    """Process a user prompt. Currently returns placeholder Lorem Ipsum content."""
-    # For now, return static Lorem Ipsum content
-    lorem_ipsum = """
-    <div class="ai-response">
-        <h3>Response</h3>
-        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt 
-        ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco 
-        laboris nisi ut aliquip ex ea commodo consequat.</p>
-        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat 
-        nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia 
-        deserunt mollit anim id est laborum.</p>
-    </div>
-    """
-    return HTMLResponse(content=lorem_ipsum)
+    """Process a user prompt using OpenAI Responses API and execute generated Python code."""
+    temp_dir: str = ""
+
+    try:
+        # Initialize OpenAI client
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return HTMLResponse(content='<div class="error">OpenAI API key not configured</div>', status_code=500)
+
+        client = OpenAI(api_key=api_key)
+
+        # Call OpenAI Responses API
+        try:
+            response = client.responses.create(
+                model="gpt-5",
+                input=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+                max_output_tokens=8192,
+                reasoning={"effort": "minimal"},
+                store=False,  # Don't store conversation history
+            )
+
+            # Extract the generated Python script
+            python_script = response.output_text
+
+        except Exception as e:
+            return HTMLResponse(content=f'<div class="error">OpenAI API call failed: {str(e)}</div>', status_code=500)
+
+        # Create temporary directory for script execution
+        temp_dir = tempfile.mkdtemp()
+
+        # Execute the Python script in the temporary directory
+        original_dir = os.getcwd()
+        try:
+            # Change to temp directory
+            os.chdir(temp_dir)
+
+            # Basic sandboxing: restrict builtins but allow necessary imports
+            restricted_globals = {
+                "__builtins__": {
+                    "open": open,
+                    "print": print,
+                    "range": range,
+                    "len": len,
+                    "str": str,
+                    "int": int,
+                    "float": float,
+                    "list": list,
+                    "dict": dict,
+                    "tuple": tuple,
+                    "set": set,
+                    "enumerate": enumerate,
+                    "zip": zip,
+                    "map": map,
+                    "filter": filter,
+                    "sorted": sorted,
+                    "sum": sum,
+                    "min": min,
+                    "max": max,
+                    "abs": abs,
+                    "round": round,
+                    "isinstance": isinstance,
+                    "type": type,
+                    "__import__": __import__,
+                },
+            }
+
+            # Execute the script
+            exec(python_script, restricted_globals)
+
+            # Change back to original directory
+            os.chdir(original_dir)
+
+        except Exception as e:
+            os.chdir(original_dir)
+            return HTMLResponse(content=f'<div class="error">Script execution failed: {str(e)}</div>', status_code=500)
+
+        # Read the generated HTML
+        html_path = Path(temp_dir) / "index.html"
+        if not html_path.exists():
+            return HTMLResponse(content='<div class="error">Generated script did not create index.html</div>', status_code=500)
+
+        with open(html_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+
+        # Find all image references and embed them as base64
+        img_pattern = re.compile(r'<img\s+[^>]*src="([^"]+)"[^>]*>', re.IGNORECASE)
+
+        def replace_image(match: re.Match[str]) -> str:
+            img_src = match.group(1)
+            img_path = Path(temp_dir) / img_src
+
+            if img_path.exists():
+                with open(img_path, "rb") as img_file:
+                    img_data = img_file.read()
+                    img_base64 = base64.b64encode(img_data).decode("utf-8")
+                    # Determine MIME type based on extension
+                    ext = img_path.suffix.lower()
+                    mime_type = "image/png" if ext == ".png" else "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/gif"
+                    # Replace src with base64 data URL
+                    return match.group(0).replace(f'src="{img_src}"', f'src="data:{mime_type};base64,{img_base64}"')
+            return match.group(0)
+
+        # Replace all image sources with base64
+        html_content = img_pattern.sub(replace_image, html_content)
+
+        return HTMLResponse(content=html_content)
+
+    finally:
+        # Clean up temporary directory
+        if temp_dir and Path(temp_dir).exists():
+            shutil.rmtree(temp_dir)
